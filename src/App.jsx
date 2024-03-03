@@ -17,10 +17,8 @@ import './App.css'
  //business logic. Otherwise retain the {} and put a "return" statement
  const App = () => { 
 
-  const [stories, setStories] = React.useState([]);
-
   //useEffect is called:
-  //  1. initially when the component renders the first time
+  //  1. Initially when the component renders the first time
   //  2. Leaving out the second argument (the dependency array) 
   //     would make the function for the side-effect (e.g getAsyncStories)
   //     run on every render (initial render and update renders) of 
@@ -33,28 +31,103 @@ import './App.css'
   //     component. It can be triggered when the component is first 
   //     mounted, but also if one of its values (state, props, derived 
   //     values from state/props) is updated.
-    React.useEffect(() => {
-     getAsyncStories().then(result => {
-        setStories(result.data.stories);
-      });
-    }, []); 
-
    const [users, setUsers] = React.useState([]);
-   React.useEffect(() => {
-    const doGetUsers = async ()  => {
-       const result = await getUsers();
-       setUsers(result);
-     };
-     doGetUsers();
+
+   /* 
+     We have to use React's useCallback Hook here, because it memoizes 
+     the function for us which mean that it doesn't change and therefore 
+     React's useEffect Hook isn't called in an endless loop. 
+   */
+    const doGetUsers = React.useCallback(async ()  => {
+      try {
+        const result = await getUsers();
+        setUsers(result);
+      } catch (error){
+        console.log(error);
+      }
+     
    }, []); 
+
+   React.useEffect( () => {
+    doGetUsers();
+   }, [doGetUsers]); //Since doGetUsers above is memoize by using React.useCallback
+                     //it means doGetUsers doesn't change and therefore
+                     //useEffect hook isn't called in an ENDLESS loop.
+
+   //Next, we can reuse this extracted function to refetch the 
+   //mocked data after creating new data:
+   const refetchUsers = async () => {
+    await doGetUsers();
+  };
+
+
+  //States for first ande last names
+  const [firstName, setFirstName] = React.useState('');
+  const [lastName, setLastName] = React.useState('');
+
+  //Event handler for firstName
+  const handleChangeFirstName = (event) => {
+    setFirstName(event.target.value);
+  };
+
+  //Event handler for lastName
+  const handleChangeLastName = (event) => {
+    setLastName(event.target.value);
+  };
+
+   
+
+  //Event handler for Submit button
+  //There are two ways to keep the UI in sync after a request 
+  //which modifies data on the backend:
+  /*
+    1. After the request finishes, we know about the mock data 
+    which we just created, so we could update the React's state 
+    with it (.e.g. updating the users state with the new user).
+
+    2. After the request finishes, we could refetch all the mock 
+    data from the backend. That's another network roundtrip to 
+    the backend (which is our fake API here), but it keeps our 
+    data in sync with the rendered UI as well. (THE PREFERRED WAY)
+
+  */
+  const handleCreate = async (event) => {
+    event.preventDefault();  //Prevents the default to avoid browser refresh
+
+    try {
+      await createUser({ firstName, lastName, isDeveloper: false }); 
+      await refetchUsers(); //After creating new record, we refetch all the mock data.
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  if (!users) {
+    return null;
+  }
 
   return (
      <div>
-       <h1> My Fake API</h1>
+       <h1> Create a User</h1>
+       <span>Create User:</span>
+
+      <form onSubmit={handleCreate}>
+        <label>
+          First Name:
+          <input type="input" onChange={handleChangeFirstName} />
+        </label>
+
+        <label>
+          Last Name:
+          <input type="input" onChange={handleChangeLastName} />
+        </label>
+
+        <button className="btn btn-primary" type="submit">Create</button>
+      </form>
+
        <hr />
        <UserList list={users}/>
-       <hr />
-       <List list={stories}/>
+       
      </div>
    );
 }
